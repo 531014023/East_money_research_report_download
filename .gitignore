@@ -2,6 +2,10 @@
 reports_pdf/
 */reports_pdf/
 
+# 原始数据文件夹
+raw_data/
+detail_data/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -71,7 +71,19 @@ def fetch_jsonp_data(page_no=1):
         response.raise_for_status()
         # 提取JSON部分
         json_str = re.search(r'\((.*)\)', response.text).group(1)
-        return json.loads(json_str)
+        data = json.loads(json_str)
+        
+        # 保存原始数据到本地
+        raw_data_dir = "raw_data"
+        if not os.path.exists(raw_data_dir):
+            os.makedirs(raw_data_dir, exist_ok=True)
+        
+        raw_data_file = os.path.join(raw_data_dir, f"page_{page_no}_{STOCK_CODE}_{begin_time}_{end_time}.json")
+        with open(raw_data_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        print(f"原始数据已保存: {raw_data_file}")
+        return data
     except Exception as e:
         print(f"获取第{page_no}页数据失败: {e}")
         return None
@@ -91,15 +103,27 @@ def get_report_detail(info_code):
     try:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
+        
+        # 保存详情页HTML原始数据
+        detail_data_dir = "detail_data"
+        if not os.path.exists(detail_data_dir):
+            os.makedirs(detail_data_dir, exist_ok=True)
+        
+        detail_html_file = os.path.join(detail_data_dir, f"detail_{info_code}.html")
+        with open(detail_html_file, 'w', encoding='utf-8') as f:
+            f.write(response.text)
+        
+        print(f"详情页HTML已保存: {detail_html_file}")
         return response.text
     except Exception as e:
         print(f"获取报告详情{info_code}失败: {e}")
         return None
 
-def parse_detail_page(html):
+def parse_detail_page(html, info_code):
     """
     解析详情页获取PDF下载链接及相关信息
     :param html: 详情页HTML
+    :param info_code: 报告ID
     :return: dict，包含PDF下载URL及命名所需字段
     """
     try:
@@ -108,6 +132,15 @@ def parse_detail_page(html):
         if not match:
             return None
         zwinfo = json.loads(match.group(1))
+        
+        # 保存解析后的zwinfo数据
+        detail_data_dir = "detail_data"
+        zwinfo_file = os.path.join(detail_data_dir, f"zwinfo_{info_code}.json")
+        with open(zwinfo_file, 'w', encoding='utf-8') as f:
+            json.dump(zwinfo, f, ensure_ascii=False, indent=2)
+        
+        print(f"zwinfo数据已保存: {zwinfo_file}")
+        
         # 提取所需字段
         return {
             'attach_url': zwinfo.get('attach_url'),
@@ -240,7 +273,7 @@ def process_all_reports():
             if not detail_html:
                 continue
             # 解析PDF链接及命名信息
-            detail_info = parse_detail_page(detail_html)
+            detail_info = parse_detail_page(detail_html, info_code)
             if not detail_info or not detail_info.get('attach_url'):
                 print("未找到PDF链接")
                 continue
@@ -262,6 +295,11 @@ def process_all_reports():
             # 分离文件名和目录
             pdf_filename = f"{'_'.join(filename_parts)}.pdf"
             pdf_subdir = f"{short_name}"
+            
+            # 判断是否为深度报告（页数大于20页）
+            if attach_pages > 20:
+                pdf_subdir = f"{short_name}/深度报告"
+            
             pdf_full_path = os.path.join(DOWNLOAD_DIR, pdf_subdir, pdf_filename)
             
             # 检查并创建目录
@@ -269,6 +307,12 @@ def process_all_reports():
             if not os.path.exists(pdf_dir):
                 os.makedirs(pdf_dir, exist_ok=True)
                 print(f"创建目录: {pdf_dir}")
+            
+            # 检查文件是否已存在
+            if os.path.exists(pdf_full_path):
+                print(f"文件已存在，跳过下载: {pdf_full_path}")
+                continue
+                
             # 下载PDF并校验页数，最多重试3次
             max_retries = 3
             for attempt in range(1, max_retries + 1):
@@ -284,20 +328,6 @@ def process_all_reports():
                     is_complete, actual_pages = is_pdf_complete(pdf_full_path, expected_pages)
                     if is_complete:
                         print(f"✓ PDF页数校验通过：{actual_pages}页")
-                        # 如果页数大于20页，移动到深度报告目录
-                        if actual_pages > 20:
-                            # 在当前研报目录下创建深度报告子目录
-                            deep_report_dir = os.path.join(pdf_dir, "深度报告")
-                            if not os.path.exists(deep_report_dir):
-                                os.makedirs(deep_report_dir, exist_ok=True)
-                                print(f"创建深度报告目录: {deep_report_dir}")
-                            # 移动文件到深度报告目录
-                            new_pdf_path = os.path.join(deep_report_dir, pdf_filename)
-                            try:
-                                os.rename(pdf_full_path, new_pdf_path)
-                                print(f"✓ 已移动到深度报告目录: {pdf_filename}")
-                            except Exception as e:
-                                print(f"移动文件失败: {e}")
                         break
                     else:
                         print(f"✗ PDF页数不符：实际{actual_pages}页，预期{expected_pages}页，正在重试({attempt}/{max_retries})...")
@@ -310,7 +340,7 @@ def process_all_reports():
                 else:
                     break
             else:
-                print(f"!!! PDF多次下载后仍不完整：{pdf_filename}")
+                print(f"!!! PDF多次下载后仍不完整：{pdf_full_path}")
             # 礼貌性延迟
             sleep(1)
 
