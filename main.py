@@ -44,6 +44,19 @@ def fetch_jsonp_data(page_no=1):
     today = datetime.today()
     end_time = today.strftime('%Y-%m-%d')
     begin_time = (today - timedelta(days=365*YEARS_AGO)).strftime('%Y-%m-%d')
+    
+    # 检查是否存在已保存的原始数据
+    raw_data_dir = "raw_data"
+    raw_data_file = os.path.join(raw_data_dir, f"page_{page_no}_{STOCK_CODE}_{begin_time}_{end_time}.json")
+    
+    if os.path.exists(raw_data_file):
+        print(f"使用已保存的原始数据: {raw_data_file}")
+        try:
+            with open(raw_data_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"读取已保存数据失败: {e}")
+    
     params = {
         "cb": "datatable6333112",
         "pageNo": page_no,
@@ -74,11 +87,9 @@ def fetch_jsonp_data(page_no=1):
         data = json.loads(json_str)
         
         # 保存原始数据到本地
-        raw_data_dir = "raw_data"
         if not os.path.exists(raw_data_dir):
             os.makedirs(raw_data_dir, exist_ok=True)
         
-        raw_data_file = os.path.join(raw_data_dir, f"page_{page_no}_{STOCK_CODE}_{begin_time}_{end_time}.json")
         with open(raw_data_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         
@@ -94,6 +105,18 @@ def get_report_detail(info_code):
     :param info_code: 报告ID
     :return: 详情页HTML内容
     """
+    # 检查是否存在已保存的详情页HTML
+    detail_data_dir = "detail_data"
+    detail_html_file = os.path.join(detail_data_dir, f"detail_{info_code}.html")
+    
+    if os.path.exists(detail_html_file):
+        print(f"使用已保存的详情页HTML: {detail_html_file}")
+        try:
+            with open(detail_html_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            print(f"读取已保存详情页失败: {e}")
+    
     url = urljoin(DETAIL_BASE_URL, f"{info_code}.html")
     headers = {
         "User-Agent": get_random_user_agent(),
@@ -105,11 +128,9 @@ def get_report_detail(info_code):
         response.raise_for_status()
         
         # 保存详情页HTML原始数据
-        detail_data_dir = "detail_data"
         if not os.path.exists(detail_data_dir):
             os.makedirs(detail_data_dir, exist_ok=True)
         
-        detail_html_file = os.path.join(detail_data_dir, f"detail_{info_code}.html")
         with open(detail_html_file, 'w', encoding='utf-8') as f:
             f.write(response.text)
         
