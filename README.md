@@ -22,9 +22,7 @@
     "stock_code": "600519",
     "min_pages": 20,
     "download_dir": "reports_pdf",
-    "years_ago": 2,
-    "f_node": "0",
-    "s_node": "0"
+    "years_ago": 2
 }
 ```
 
