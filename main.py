@@ -318,7 +318,7 @@ def process_all_reports():
             pdf_subdir = f"{short_name}"
             
             # 判断是否为深度报告（页数大于20页）
-            if attach_pages > 20:
+            if attach_pages >= 20:
                 pdf_subdir = f"{short_name}/深度报告"
             
             pdf_full_path = os.path.join(DOWNLOAD_DIR, pdf_subdir, pdf_filename)
